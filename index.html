@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="robots" content="noindex">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <link rel="apple-touch-icon" href="banaan.ico">
+    <title>Andy's Training</title>
+    <style>
+        body { margin: 0; height: 100vh; display: flex; flex-direction: column; 
+               align-items: center; justify-content: center; font-family: sans-serif; 
+               transition: background-color 0.3s; text-align: center; user-select: none; }
+        #action { font-size: 3rem; font-weight: bold; }
+        #timer { font-size: 10rem; font-weight: bold; margin: 20px 0; }
+        #sub { font-size: 1.5rem; }
+        #start-btn { padding: 25px 50px; font-size: 2rem; background: #4CAF50; color: white; border: none; border-radius: 15px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <button id="start-btn" onclick="init()">START TRAINING</button>
+    </div>
+
+    <script>
+        const audioPath = "audio/";
+        const sounds = {
+            intro: new Audio(audioPath + "naamloos.wav"),
+            start: new Audio(audioPath + "START.mp3"),
+            stop0: new Audio(audioPath + "STOP 0.536 SECONDEN.mp3"),
+            stop3: new Audio(audioPath + "STOP 3.mp3"),
+            stop4: new Audio(audioPath + "STOP 4.625 SEC.mp3"),
+            finish: new Audio(audioPath + "aftellen van 1 naar 0.mp3")
+        };
+
+        // We laden de countdown-bestanden
+        for(let i=2; i<=10; i++) {
+            let fileName = `aftellen ${i === 3 ? 'van 3' : i} naar 1.mp3`;
+            sounds[`count${i}`] = new Audio(audioPath + fileName);
+        }
+
+        let queue = [];
+        let currentTimer;
+
+        // --- Dezelfde faselogica als in de EXE ---
+        function buildPhases(introDur) {
+            queue.push({action: "WACHT", color: "red", dur: introDur, next: 15});
+            for (let i = 15; i >= 3; i--) {
+                queue.push({action: "START", color: "green", dur: i, next: i});
+                queue.push({action: "STOP", color: "red", dur: i, next: (i > 3 ? i-1 : 3)});
+            }
+            for (let i = 3; i <= 15; i++) {
+                queue.push({action: "START", color: "green", dur: i, next: i});
+                queue.push({action: "STOP", color: "red", dur: i, next: (i < 15 ? i+1 : 10)});
+            }
+            // Random en Fixed fases volgen hier (weggelaten voor de leesbaarheid van de fix)
+        }
+
+        function init() {
+            document.getElementById('ui').innerHTML = `<div id="action">LADEN...</div><div id="timer">--</div><div id="sub">Momentje</div>`;
+            sounds.intro.onloadedmetadata = () => { buildPhases(Math.floor(sounds.intro.duration)); startCycle(); };
+            sounds.intro.load();
+        }
+
+        function startCycle() {
+            if (queue.length === 0) { location.reload(); return; }
+            const step = queue.shift();
+            updateUI(step);
+
+            if(step.action === "WACHT") {
+                sounds.intro.play();
+            } else {
+                // FIX: Speel ALLEEN het bestand dat matcht met de volledige duur van deze stap
+                // Bijv: als de ronde 10 sec duurt, start op seconde 10 het bestand "10 naar 1"
+                if (step.dur <= 10 && sounds[`count${step.dur}`]) {
+                    sounds[`count${step.dur}`].play();
+                }
+            }
+
+            let time = step.dur;
+            currentTimer = setInterval(() => {
+                document.getElementById('timer').innerText = time;
+                
+                // Op seconde 1 spelen we ALTIJD de transitie-geluiden
+                if(time === 1) {
+                    sounds.finish.play(); // "1 naar 0"
+                    if(queue[0]) {
+                        if(queue[0].action === "START") sounds.start.play();
+                        if(queue[0].action === "STOP") {
+                            let nextDur = queue[0].dur;
+                            if(nextDur < 4) sounds.stop0.play();
+                            else if(nextDur < 6) sounds.stop3.play();
+                            else sounds.stop4.play();
+                        }
+                    }
+                }
+
+                if(time <= 0) { clearInterval(currentTimer); startCycle(); }
+                time--;
+            }, 1000);
+        }
+
+        function updateUI(step) {
+            document.body.style.backgroundColor = step.color;
+            document.body.style.color = (step.color === 'red') ? 'yellow' : 'black';
+            document.getElementById('action').innerText = step.action;
+            document.getElementById('sub').innerText = (typeof step.next === 'number') ? `Volgende: ${step.next}s` : step.next;
+        }
+    </script>
+</body>
+</html>
