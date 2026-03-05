@@ -39,7 +39,7 @@
             right: 20px;
             padding: 10px;
             font-size: 14px;
-            background: rgba(255,255,255,0.2);
+            background: rgba(255,255,255,0.4);
             color: white;
         }
     </style>
@@ -50,7 +50,7 @@
 
     <div id="ui-container">
         <div id="action">ANDY TRAINING</div>
-        <div id="timer">KIES START</div>
+        <div id="timer">MAAK EEN KEUZE</div>
         <div class="menu-btns" id="menu">
             <button onclick="startSetup(false)">MET SONG</button>
             <button onclick="startSetup(true)">SNELSTART (20s)</button>
@@ -63,14 +63,11 @@
         let queue = [];
         let currentInterval;
 
-        // Laad alle audio bestanden
         function loadSounds() {
             const files = {
                 intro: "naamloos.wav",
                 start: "START.mp3",
-                stop0: "stop 0.555 sec.mp3",
-                stop3: "STOP 3.mp3",
-                stop4: "STOP 4.625 SEC.mp3",
+                stop: "stop 0.555 sec.mp3", // Gebruikt nu alleen de korte versie
                 finish: "aftellen van 1 naar 0.mp3"
             };
 
@@ -89,18 +86,24 @@
         function startSetup(skipSong) {
             document.getElementById('menu').style.display = 'none';
             
-            // Unlock audio voor mobiel (moet binnen een click event)
+            // Unlock audio voor mobiel
             Object.values(sounds).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
 
             let introDur = 20;
             if (!skipSong) {
                 sounds.intro.play();
-                // We gebruiken 180s als de duration nog niet geladen is
                 introDur = Math.floor(sounds.intro.duration) || 180;
             }
 
             buildQueue(introDur);
             runCycle();
+        }
+
+        function addMaybeLongCycle() {
+            if (Math.random() < 0.25) {
+                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
+                queue.push({action: "STOP", color: "red", dur: 10});
+            }
         }
 
         function buildQueue(introDur) {
@@ -135,42 +138,26 @@
             }
         }
 
-        function addMaybeLongCycle() {
-            if (Math.random() < 0.25) {
-                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
-                queue.push({action: "STOP", color: "red", dur: 10});
-            }
-        }
-
         function runCycle() {
             if (queue.length === 0) {
-                // Oneindige lus
                 queue.push({action: "START", color: "green", dur: 7});
                 addMaybeLongCycle();
-                queue.push({action: "STOP", color: "red", dur: 6, isInfinite: true});
+                queue.push({action: "STOP", color: "red", dur: 6});
             }
 
             const step = queue.shift();
             let timeLeft = step.dur;
 
-            // UI Update
             document.body.style.backgroundColor = step.color;
             document.body.style.color = (step.color === 'red') ? 'yellow' : 'black';
             document.getElementById('action').innerText = step.action;
 
-            // Audio Commando
             if (step.action !== "WACHT") {
                 stopAllAudio();
                 if (step.action === "START") {
                     sounds.start.play();
                 } else {
-                    if (step.isInfinite) {
-                        sounds.stop0.play();
-                    } else {
-                        if (timeLeft < 4) sounds.stop0.play();
-                        else if (timeLeft < 6) sounds.stop3.play();
-                        else sounds.stop4.play();
-                    }
+                    sounds.stop.play(); // Speelt altijd de korte stop
                 }
             }
 
@@ -180,7 +167,6 @@
                 
                 if (step.action !== "WACHT") {
                     if (timeLeft <= 10 && timeLeft > 1) {
-                        // Check of er al iets speelt (get_busy alternatief voor web)
                         let playing = Object.values(sounds).some(s => !s.paused && s.currentTime > 0 && s !== sounds.intro);
                         if (!playing) {
                             if (sounds[`count${timeLeft}`]) sounds[`count${timeLeft}`].play();
