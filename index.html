@@ -18,7 +18,6 @@
             height: 100vh;
             overflow: hidden;
             text-align: center;
-            transition: background-color 0.3s;
         }
         #action { font-size: 15vw; font-weight: bold; margin-bottom: 20px; }
         #timer { font-size: 30vw; font-weight: bold; }
@@ -64,17 +63,19 @@
         let currentInterval;
 
         function loadSounds() {
+            // Namen zijn nu exact aangepast aan jouw lijst
             const files = {
                 intro: "naamloos.wav",
                 start: "START.mp3",
-                stop: "stop 0.555 sec.mp3", // Gebruikt nu alleen de korte versie
-                finish: "aftellen van 1 naar 0.mp3"
+                stop: "stop 0.555 sec.mp3", 
+                finish: "aftellen 1 naar 1.mp3"
             };
 
             for (let key in files) {
                 sounds[key] = new Audio(audioPath + files[key]);
             }
 
+            // Cijfers 2 t/m 10 laden
             for (let i = 2; i <= 10; i++) {
                 let fname = (i === 5) ? "aftellen5 naar 1.mp3" : `aftellen ${i} naar 1.mp3`;
                 sounds[`count${i}`] = new Audio(audioPath + fname);
@@ -86,8 +87,10 @@
         function startSetup(skipSong) {
             document.getElementById('menu').style.display = 'none';
             
-            // Unlock audio voor mobiel
-            Object.values(sounds).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
+            // Kritieke stap: Alle audio "prikken" voor smartphone toestemming
+            Object.values(sounds).forEach(s => { 
+                s.play().then(() => { s.pause(); s.currentTime = 0; }).catch(e => {});
+            });
 
             let introDur = 20;
             if (!skipSong) {
@@ -99,42 +102,36 @@
             runCycle();
         }
 
-        function addMaybeLongCycle() {
-            if (Math.random() < 0.25) {
-                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
-                queue.push({action: "STOP", color: "red", dur: 10});
-            }
-        }
-
         function buildQueue(introDur) {
             queue.push({action: "WACHT", color: "red", dur: introDur});
             
-            // 6x 20s/10s
+            // Fases opbouwen
             for(let i=0; i<6; i++) {
                 queue.push({action: "START", color: "green", dur: 20});
                 queue.push({action: "STOP", color: "red", dur: 10});
                 addMaybeLongCycle();
             }
-
-            // 15 -> 3
             for(let i=15; i>=3; i--) {
                 queue.push({action: "START", color: "green", dur: i});
                 queue.push({action: "STOP", color: "red", dur: i});
                 addMaybeLongCycle();
             }
-
-            // 3 -> 15
             for(let i=3; i<=15; i++) {
                 queue.push({action: "START", color: "green", dur: i});
                 queue.push({action: "STOP", color: "red", dur: i});
                 addMaybeLongCycle();
             }
-
-            // 12x Random
             for(let i=0; i<12; i++) {
                 queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*13)+3});
                 queue.push({action: "STOP", color: "red", dur: Math.floor(Math.random()*13)+3});
                 addMaybeLongCycle();
+            }
+        }
+
+        function addMaybeLongCycle() {
+            if (Math.random() < 0.25) {
+                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
+                queue.push({action: "STOP", color: "red", dur: 10});
             }
         }
 
@@ -156,8 +153,8 @@
                 stopAllAudio();
                 if (step.action === "START") {
                     sounds.start.play();
-                } else {
-                    sounds.stop.play(); // Speelt altijd de korte stop
+                } else if (step.action === "STOP") {
+                    sounds.stop.play();
                 }
             }
 
@@ -166,6 +163,7 @@
                 document.getElementById('timer').innerText = timeLeft;
                 
                 if (step.action !== "WACHT") {
+                    // Aftellen audio triggers
                     if (timeLeft <= 10 && timeLeft > 1) {
                         let playing = Object.values(sounds).some(s => !s.paused && s.currentTime > 0 && s !== sounds.intro);
                         if (!playing) {
