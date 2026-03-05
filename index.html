@@ -5,19 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Andy Training</title>
     <style>
-        body { margin: 0; background-color: red; color: yellow; font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; }
+        body { margin: 0; background-color: red; color: yellow; font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; overflow: hidden; }
         #action { font-size: 15vw; font-weight: bold; }
         #timer { font-size: 30vw; }
-        button { padding: 20px; font-size: 20px; background: white; color: red; border-radius: 10px; border: none; cursor: pointer; margin: 10px; }
-        #error-log { color: white; font-size: 12px; position: absolute; bottom: 10px; }
+        button { padding: 25px; font-size: 22px; background: white; color: red; border-radius: 15px; border: none; cursor: pointer; margin: 10px; font-weight: bold; }
+        #error-log { color: white; font-size: 10px; position: absolute; bottom: 5px; width: 90%; word-wrap: break-word; opacity: 0.7; }
     </style>
 </head>
 <body>
     <div id="action">ANDY TRAINING</div>
     <div id="timer">KIES START</div>
     <div id="menu">
-        <button onclick="start(false)">MET SONG</button>
-        <button onclick="start(true)">SNELSTART (20s)</button>
+        <button onclick="startApp(false)">MET SONG</button>
+        <button onclick="startApp(true)">SNELSTART (20s)</button>
     </div>
     <div id="error-log"></div>
 
@@ -30,27 +30,51 @@
             finish: new Audio(audioPath + "aftellen 1 naar 1.mp3")
         };
 
-        function logError(msg) { document.getElementById('error-log').innerText += msg + " | "; }
+        function logError(msg) { 
+            console.error(msg);
+            document.getElementById('error-log').innerText += msg + " | "; 
+        }
 
-        // Test of bestanden laden
+        // Check of bestanden bestaan op de server
         Object.keys(sounds).forEach(key => {
-            sounds[key].onerror = () => logError("Kan " + sounds[key].src + " niet vinden");
+            sounds[key].onerror = () => logError("Fout: " + key + " (" + sounds[key].src.split('/').pop() + ")");
         });
 
-        function start(skip) {
+        function startApp(skip) {
             document.getElementById('menu').style.display = 'none';
-            // Unlock audio
-            Object.values(sounds).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
             
-            let dur = 20;
-            if(!skip) { sounds.intro.play(); dur = 180; }
-            
-            setTimeout(() => {
-                document.body.style.backgroundColor = "green";
-                document.getElementById('action').innerText = "START";
-                sounds.start.play();
-                // Hier start de rest van de cyclus...
-            }, dur * 1000);
+            // Smartphone Audio Unlock (Cruciaal!)
+            Object.values(sounds).forEach(s => {
+                s.play().then(() => { s.pause(); s.currentTime = 0; }).catch(e => logError("Unlock falen: " + e.message));
+            });
+
+            let waitTime = skip ? 20 : 180;
+            if (!skip) { 
+                sounds.intro.play().catch(e => logError("Song faalt")); 
+                // Gebruik echte lengte als beschikbaar
+                sounds.intro.onloadedmetadata = () => { waitTime = Math.floor(sounds.intro.duration); };
+            }
+
+            document.getElementById('action').innerText = "WACHT";
+            let remaining = waitTime;
+
+            const countdown = setInterval(() => {
+                document.getElementById('timer').innerText = remaining;
+                if (remaining <= 0) {
+                    clearInterval(countdown);
+                    beginTraining();
+                }
+                remaining--;
+            }, 1000);
+        }
+
+        function beginTraining() {
+            document.body.style.backgroundColor = "green";
+            document.body.style.color = "black";
+            document.getElementById('action').innerText = "START";
+            sounds.start.play().catch(e => logError("Start-audio faalt"));
+            document.getElementById('timer').innerText = "GO!";
+            // De rest van je trainingscyclus kan hieronder worden toegevoegd
         }
     </script>
 </body>
