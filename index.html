@@ -2,194 +2,55 @@
 <html lang="nl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Andy Training</title>
     <style>
-        body {
-            margin: 0;
-            padding: 0;
-            background-color: red;
-            color: yellow;
-            font-family: Arial, sans-serif;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            overflow: hidden;
-            text-align: center;
-        }
-        #action { font-size: 15vw; font-weight: bold; margin-bottom: 20px; }
-        #timer { font-size: 30vw; font-weight: bold; }
-        .menu-btns { display: flex; gap: 20px; }
-        button {
-            padding: 20px 30px;
-            font-size: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            border-radius: 10px;
-            background: white;
-            color: red;
-        }
-        #stop-btn {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            padding: 10px;
-            font-size: 14px;
-            background: rgba(255,255,255,0.4);
-            color: white;
-        }
+        body { margin: 0; background-color: red; color: yellow; font-family: Arial; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; text-align: center; }
+        #action { font-size: 15vw; font-weight: bold; }
+        #timer { font-size: 30vw; }
+        button { padding: 20px; font-size: 20px; background: white; color: red; border-radius: 10px; border: none; cursor: pointer; margin: 10px; }
+        #error-log { color: white; font-size: 12px; position: absolute; bottom: 10px; }
     </style>
 </head>
 <body>
-
-    <button id="stop-btn" onclick="location.reload()">STOP / RESET</button>
-
-    <div id="ui-container">
-        <div id="action">ANDY TRAINING</div>
-        <div id="timer">MAAK EEN KEUZE</div>
-        <div class="menu-btns" id="menu">
-            <button onclick="startSetup(false)">MET SONG</button>
-            <button onclick="startSetup(true)">SNELSTART (20s)</button>
-        </div>
+    <div id="action">ANDY TRAINING</div>
+    <div id="timer">KIES START</div>
+    <div id="menu">
+        <button onclick="start(false)">MET SONG</button>
+        <button onclick="start(true)">SNELSTART (20s)</button>
     </div>
+    <div id="error-log"></div>
 
     <script>
         const audioPath = "audio/";
-        const sounds = {};
-        let queue = [];
-        let currentInterval;
+        const sounds = {
+            intro: new Audio(audioPath + "naamloos.wav"),
+            start: new Audio(audioPath + "START.mp3"),
+            stop: new Audio(audioPath + "stop 0.555 sec.mp3"),
+            finish: new Audio(audioPath + "aftellen 1 naar 1.mp3")
+        };
 
-        function loadSounds() {
-            // Namen zijn nu exact aangepast aan jouw lijst
-            const files = {
-                intro: "naamloos.wav",
-                start: "START.mp3",
-                stop: "stop 0.555 sec.mp3", 
-                finish: "aftellen 1 naar 1.mp3"
-            };
+        function logError(msg) { document.getElementById('error-log').innerText += msg + " | "; }
 
-            for (let key in files) {
-                sounds[key] = new Audio(audioPath + files[key]);
-            }
+        // Test of bestanden laden
+        Object.keys(sounds).forEach(key => {
+            sounds[key].onerror = () => logError("Kan " + sounds[key].src + " niet vinden");
+        });
 
-            // Cijfers 2 t/m 10 laden
-            for (let i = 2; i <= 10; i++) {
-                let fname = (i === 5) ? "aftellen5 naar 1.mp3" : `aftellen ${i} naar 1.mp3`;
-                sounds[`count${i}`] = new Audio(audioPath + fname);
-            }
-        }
-
-        loadSounds();
-
-        function startSetup(skipSong) {
+        function start(skip) {
             document.getElementById('menu').style.display = 'none';
+            // Unlock audio
+            Object.values(sounds).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
             
-            // Kritieke stap: Alle audio "prikken" voor smartphone toestemming
-            Object.values(sounds).forEach(s => { 
-                s.play().then(() => { s.pause(); s.currentTime = 0; }).catch(e => {});
-            });
-
-            let introDur = 20;
-            if (!skipSong) {
-                sounds.intro.play();
-                introDur = Math.floor(sounds.intro.duration) || 180;
-            }
-
-            buildQueue(introDur);
-            runCycle();
-        }
-
-        function buildQueue(introDur) {
-            queue.push({action: "WACHT", color: "red", dur: introDur});
+            let dur = 20;
+            if(!skip) { sounds.intro.play(); dur = 180; }
             
-            // Fases opbouwen
-            for(let i=0; i<6; i++) {
-                queue.push({action: "START", color: "green", dur: 20});
-                queue.push({action: "STOP", color: "red", dur: 10});
-                addMaybeLongCycle();
-            }
-            for(let i=15; i>=3; i--) {
-                queue.push({action: "START", color: "green", dur: i});
-                queue.push({action: "STOP", color: "red", dur: i});
-                addMaybeLongCycle();
-            }
-            for(let i=3; i<=15; i++) {
-                queue.push({action: "START", color: "green", dur: i});
-                queue.push({action: "STOP", color: "red", dur: i});
-                addMaybeLongCycle();
-            }
-            for(let i=0; i<12; i++) {
-                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*13)+3});
-                queue.push({action: "STOP", color: "red", dur: Math.floor(Math.random()*13)+3});
-                addMaybeLongCycle();
-            }
-        }
-
-        function addMaybeLongCycle() {
-            if (Math.random() < 0.25) {
-                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
-                queue.push({action: "STOP", color: "red", dur: 10});
-            }
-        }
-
-        function runCycle() {
-            if (queue.length === 0) {
-                queue.push({action: "START", color: "green", dur: 7});
-                addMaybeLongCycle();
-                queue.push({action: "STOP", color: "red", dur: 6});
-            }
-
-            const step = queue.shift();
-            let timeLeft = step.dur;
-
-            document.body.style.backgroundColor = step.color;
-            document.body.style.color = (step.color === 'red') ? 'yellow' : 'black';
-            document.getElementById('action').innerText = step.action;
-
-            if (step.action !== "WACHT") {
-                stopAllAudio();
-                if (step.action === "START") {
-                    sounds.start.play();
-                } else if (step.action === "STOP") {
-                    sounds.stop.play();
-                }
-            }
-
-            if (currentInterval) clearInterval(currentInterval);
-            currentInterval = setInterval(() => {
-                document.getElementById('timer').innerText = timeLeft;
-                
-                if (step.action !== "WACHT") {
-                    // Aftellen audio triggers
-                    if (timeLeft <= 10 && timeLeft > 1) {
-                        let playing = Object.values(sounds).some(s => !s.paused && s.currentTime > 0 && s !== sounds.intro);
-                        if (!playing) {
-                            if (sounds[`count${timeLeft}`]) sounds[`count${timeLeft}`].play();
-                        }
-                    }
-                    if (timeLeft === 1) {
-                        sounds.finish.play();
-                    }
-                }
-
-                if (timeLeft <= 0) {
-                    clearInterval(currentInterval);
-                    runCycle();
-                }
-                timeLeft--;
-            }, 1000);
-        }
-
-        function stopAllAudio() {
-            for (let key in sounds) {
-                if (key !== 'intro') {
-                    sounds[key].pause();
-                    sounds[key].currentTime = 0;
-                }
-            }
+            setTimeout(() => {
+                document.body.style.backgroundColor = "green";
+                document.getElementById('action').innerText = "START";
+                sounds.start.play();
+                // Hier start de rest van de cyclus...
+            }, dur * 1000);
         }
     </script>
 </body>
