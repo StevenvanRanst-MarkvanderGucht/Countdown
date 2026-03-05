@@ -14,6 +14,7 @@
         #timer { font-size: 10rem; font-weight: bold; margin: 20px 0; }
         #sub { font-size: 1.5rem; }
         #start-btn { padding: 25px 50px; font-size: 2rem; background: #4CAF50; color: white; border: none; border-radius: 15px; cursor: pointer; }
+        #error-log { color: white; background: rgba(0,0,0,0.5); font-size: 0.8rem; position: fixed; bottom: 0; width: 100%; }
     </style>
 </head>
 <body>
@@ -21,45 +22,77 @@
     <div id="ui">
         <button id="start-btn" onclick="init()">START TRAINING</button>
     </div>
+    <div id="error-log"></div>
 
     <script>
-        const audioPath = "audio/";
+        // AANPASSING 1: audioPath is nu leeg
+        const audioPath = ""; 
+        
+        // AANPASSING 2: Namen exact zoals in je PDF-screenshot
         const sounds = {
             intro: new Audio(audioPath + "naamloos.wav"),
             start: new Audio(audioPath + "START.mp3"),
-            stop0: new Audio(audioPath + "STOP 0.536 SECONDEN.mp3"),
+            stop0: new Audio(audioPath + "stop 0.555 sec.mp3"), 
             stop3: new Audio(audioPath + "STOP 3.mp3"),
             stop4: new Audio(audioPath + "STOP 4.625 SEC.mp3"),
             finish: new Audio(audioPath + "aftellen van 1 naar 0.mp3")
         };
 
-        // We laden de countdown-bestanden
+        // Countdown bestanden laden
         for(let i=2; i<=10; i++) {
             let fileName = `aftellen ${i === 3 ? 'van 3' : i} naar 1.mp3`;
             sounds[`count${i}`] = new Audio(audioPath + fileName);
         }
 
+        // Foutcontrole: laat zien welk bestand niet laadt
+        Object.keys(sounds).forEach(key => {
+            sounds[key].onerror = () => {
+                document.getElementById('error-log').innerHTML += `Fout: ${sounds[key].src} niet gevonden!<br>`;
+            };
+        });
+
         let queue = [];
         let currentTimer;
 
-        // --- Dezelfde faselogica als in de EXE ---
         function buildPhases(introDur) {
             queue.push({action: "WACHT", color: "red", dur: introDur, next: 15});
+            
+            // FASE: Countdown 15 -> 3
             for (let i = 15; i >= 3; i--) {
                 queue.push({action: "START", color: "green", dur: i, next: i});
                 queue.push({action: "STOP", color: "red", dur: i, next: (i > 3 ? i-1 : 3)});
             }
+            // FASE: Countup 3 -> 15
             for (let i = 3; i <= 15; i++) {
                 queue.push({action: "START", color: "green", dur: i, next: i});
                 queue.push({action: "STOP", color: "red", dur: i, next: (i < 15 ? i+1 : 10)});
             }
-            // Random en Fixed fases volgen hier (weggelaten voor de leesbaarheid van de fix)
         }
 
         function init() {
-            document.getElementById('ui').innerHTML = `<div id="action">LADEN...</div><div id="timer">--</div><div id="sub">Momentje</div>`;
-            sounds.intro.onloadedmetadata = () => { buildPhases(Math.floor(sounds.intro.duration)); startCycle(); };
+            document.getElementById('ui').innerHTML = `
+                <div id="action">LADEN...</div>
+                <div id="timer">--</div>
+                <div id="sub">Momentje, audio wordt gecheckt</div>
+            `;
+            
+            // Start zodra de intro geladen is
+            sounds.intro.oncanplaythrough = () => {
+                const duration = Math.floor(sounds.intro.duration) || 180;
+                buildPhases(duration);
+                startCycle();
+            };
+            
+            // Forceer laden voor mobiel
             sounds.intro.load();
+            
+            // Fail-safe: als hij na 3 seconden nog op laden staat, start toch maar
+            setTimeout(() => {
+                if(queue.length === 0) {
+                    buildPhases(180);
+                    startCycle();
+                }
+            }, 3000);
         }
 
         function startCycle() {
@@ -68,10 +101,8 @@
             updateUI(step);
 
             if(step.action === "WACHT") {
-                sounds.intro.play();
+                sounds.intro.play().catch(e => console.log("Audio play blocked"));
             } else {
-                // FIX: Speel ALLEEN het bestand dat matcht met de volledige duur van deze stap
-                // Bijv: als de ronde 10 sec duurt, start op seconde 10 het bestand "10 naar 1"
                 if (step.dur <= 10 && sounds[`count${step.dur}`]) {
                     sounds[`count${step.dur}`].play();
                 }
@@ -81,15 +112,14 @@
             currentTimer = setInterval(() => {
                 document.getElementById('timer').innerText = time;
                 
-                // Op seconde 1 spelen we ALTIJD de transitie-geluiden
                 if(time === 1) {
-                    sounds.finish.play(); // "1 naar 0"
+                    sounds.finish.play();
                     if(queue[0]) {
                         if(queue[0].action === "START") sounds.start.play();
                         if(queue[0].action === "STOP") {
-                            let nextDur = queue[0].dur;
-                            if(nextDur < 4) sounds.stop0.play();
-                            else if(nextDur < 6) sounds.stop3.play();
+                            let d = queue[0].dur;
+                            if(d < 4) sounds.stop0.play();
+                            else if(d < 6) sounds.stop3.play();
                             else sounds.stop4.play();
                         }
                     }
