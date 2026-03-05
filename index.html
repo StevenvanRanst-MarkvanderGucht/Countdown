@@ -1,85 +1,212 @@
-const audioPath = ""; 
-        const sounds = {
-            intro: new Audio(audioPath + "naamloos.wav"),
-            start: new Audio(audioPath + "START.mp3"),
-            stop0: new Audio(audioPath + "stop 0.555 sec.mp3"), 
-            stop3: new Audio(audioPath + "STOP 3.mp3"),
-            stop4: new Audio(audioPath + "STOP 4.625 SEC.mp3"),
-            finish: new Audio(audioPath + "aftellen van 1 naar 0.mp3")
-        };
-
-        for(let i=2; i<=10; i++) {
-            let fileName = (i === 3) ? "aftellen van 3 naar 1.mp3" : `aftellen ${i} naar 1.mp3`;
-            sounds[`count${i}`] = new Audio(audioPath + fileName);
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Andy Training</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: red;
+            color: yellow;
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            overflow: hidden;
+            text-align: center;
+            transition: background-color 0.3s;
         }
+        #action { font-size: 15vw; font-weight: bold; margin-bottom: 20px; }
+        #timer { font-size: 30vw; font-weight: bold; }
+        .menu-btns { display: flex; gap: 20px; }
+        button {
+            padding: 20px 30px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            border-radius: 10px;
+            background: white;
+            color: red;
+        }
+        #stop-btn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px;
+            font-size: 14px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+        }
+    </style>
+</head>
+<body>
 
+    <button id="stop-btn" onclick="location.reload()">STOP / RESET</button>
+
+    <div id="ui-container">
+        <div id="action">ANDY TRAINING</div>
+        <div id="timer">KIES START</div>
+        <div class="menu-btns" id="menu">
+            <button onclick="startSetup(false)">MET SONG</button>
+            <button onclick="startSetup(true)">SNELSTART (20s)</button>
+        </div>
+    </div>
+
+    <script>
+        const audioPath = "audio/";
+        const sounds = {};
         let queue = [];
-        let currentTimer;
-        let isPlayingCountdown = false;
+        let currentInterval;
 
-        function buildPhases(introDur) {
-            queue.push({action: "WACHT", color: "red", dur: introDur, next: 15});
-            for (let i = 15; i >= 3; i--) {
-                queue.push({action: "START", color: "green", dur: i, next: i});
-                queue.push({action: "STOP", color: "red", dur: i, next: (i > 3 ? i-1 : 3)});
-            }
-            for (let i = 3; i <= 15; i++) {
-                queue.push({action: "START", color: "green", dur: i, next: i});
-                queue.push({action: "STOP", color: "red", dur: i, next: (i < 15 ? i+1 : 10)});
-            }
-        }
-
-        function init() {
-            document.getElementById('ui').innerHTML = `<div id="action">LADEN...</div><div id="timer">--</div>`;
-            sounds.intro.oncanplaythrough = () => {
-                buildPhases(Math.floor(sounds.intro.duration) || 180);
-                startCycle();
+        // Laad alle audio bestanden
+        function loadSounds() {
+            const files = {
+                intro: "naamloos.wav",
+                start: "START.mp3",
+                stop0: "stop 0.555 sec.mp3",
+                stop3: "STOP 3.mp3",
+                stop4: "STOP 4.625 SEC.mp3",
+                finish: "aftellen van 1 naar 0.mp3"
             };
-            sounds.intro.load();
-        }
 
-        function startCycle() {
-            if (currentTimer) clearInterval(currentTimer);
-            if (queue.length === 0) { location.reload(); return; }
-            
-            const step = queue.shift();
-            let time = step.dur;
-            updateUI(step);
-
-            // STOP ALLE AUDIO bij nieuwe fase om chaos te voorkomen
-            Object.values(sounds).forEach(s => { s.pause(); s.currentTime = 0; });
-
-            if(step.action === "WACHT") {
-                sounds.intro.play();
+            for (let key in files) {
+                sounds[key] = new Audio(audioPath + files[key]);
             }
 
-            currentTimer = setInterval(() => {
-                document.getElementById('timer').innerText = time;
-                
-                // Countdown logica: NIET bij WACHT, alleen tussen 2 en 10 seconden
-                if (step.action !== "WACHT" && time <= 10 && time > 1) {
-                    if (sounds[`count${time}`]) sounds[`count${time}`].play();
-                }
-
-                if(time === 1) {
-                    sounds.finish.play();
-                    if(queue[0]) {
-                        if(queue[0].action === "START") setTimeout(() => sounds.start.play(), 800);
-                        if(queue[0].action === "STOP") {
-                            let d = queue[0].dur;
-                            let s = (d < 4) ? sounds.stop0 : (d < 6 ? sounds.stop3 : sounds.stop4);
-                            setTimeout(() => s.play(), 800);
-                        }
-                    }
-                }
-
-                if(time <= 0) { clearInterval(currentTimer); startCycle(); }
-                time--;
-            }, 1000);
+            for (let i = 2; i <= 10; i++) {
+                let fname = (i === 5) ? "aftellen5 naar 1.mp3" : `aftellen ${i} naar 1.mp3`;
+                sounds[`count${i}`] = new Audio(audioPath + fname);
+            }
         }
 
-        function updateUI(step) {
+        loadSounds();
+
+        function startSetup(skipSong) {
+            document.getElementById('menu').style.display = 'none';
+            
+            // Unlock audio voor mobiel (moet binnen een click event)
+            Object.values(sounds).forEach(s => { s.play(); s.pause(); s.currentTime = 0; });
+
+            let introDur = 20;
+            if (!skipSong) {
+                sounds.intro.play();
+                // We gebruiken 180s als de duration nog niet geladen is
+                introDur = Math.floor(sounds.intro.duration) || 180;
+            }
+
+            buildQueue(introDur);
+            runCycle();
+        }
+
+        function buildQueue(introDur) {
+            queue.push({action: "WACHT", color: "red", dur: introDur});
+            
+            // 6x 20s/10s
+            for(let i=0; i<6; i++) {
+                queue.push({action: "START", color: "green", dur: 20});
+                queue.push({action: "STOP", color: "red", dur: 10});
+                addMaybeLongCycle();
+            }
+
+            // 15 -> 3
+            for(let i=15; i>=3; i--) {
+                queue.push({action: "START", color: "green", dur: i});
+                queue.push({action: "STOP", color: "red", dur: i});
+                addMaybeLongCycle();
+            }
+
+            // 3 -> 15
+            for(let i=3; i<=15; i++) {
+                queue.push({action: "START", color: "green", dur: i});
+                queue.push({action: "STOP", color: "red", dur: i});
+                addMaybeLongCycle();
+            }
+
+            // 12x Random
+            for(let i=0; i<12; i++) {
+                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*13)+3});
+                queue.push({action: "STOP", color: "red", dur: Math.floor(Math.random()*13)+3});
+                addMaybeLongCycle();
+            }
+        }
+
+        function addMaybeLongCycle() {
+            if (Math.random() < 0.25) {
+                queue.push({action: "START", color: "green", dur: Math.floor(Math.random()*11)+20});
+                queue.push({action: "STOP", color: "red", dur: 10});
+            }
+        }
+
+        function runCycle() {
+            if (queue.length === 0) {
+                // Oneindige lus
+                queue.push({action: "START", color: "green", dur: 7});
+                addMaybeLongCycle();
+                queue.push({action: "STOP", color: "red", dur: 6, isInfinite: true});
+            }
+
+            const step = queue.shift();
+            let timeLeft = step.dur;
+
+            // UI Update
             document.body.style.backgroundColor = step.color;
             document.body.style.color = (step.color === 'red') ? 'yellow' : 'black';
             document.getElementById('action').innerText = step.action;
+
+            // Audio Commando
+            if (step.action !== "WACHT") {
+                stopAllAudio();
+                if (step.action === "START") {
+                    sounds.start.play();
+                } else {
+                    if (step.isInfinite) {
+                        sounds.stop0.play();
+                    } else {
+                        if (timeLeft < 4) sounds.stop0.play();
+                        else if (timeLeft < 6) sounds.stop3.play();
+                        else sounds.stop4.play();
+                    }
+                }
+            }
+
+            if (currentInterval) clearInterval(currentInterval);
+            currentInterval = setInterval(() => {
+                document.getElementById('timer').innerText = timeLeft;
+                
+                if (step.action !== "WACHT") {
+                    if (timeLeft <= 10 && timeLeft > 1) {
+                        // Check of er al iets speelt (get_busy alternatief voor web)
+                        let playing = Object.values(sounds).some(s => !s.paused && s.currentTime > 0 && s !== sounds.intro);
+                        if (!playing) {
+                            if (sounds[`count${timeLeft}`]) sounds[`count${timeLeft}`].play();
+                        }
+                    }
+                    if (timeLeft === 1) {
+                        sounds.finish.play();
+                    }
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(currentInterval);
+                    runCycle();
+                }
+                timeLeft--;
+            }, 1000);
         }
+
+        function stopAllAudio() {
+            for (let key in sounds) {
+                if (key !== 'intro') {
+                    sounds[key].pause();
+                    sounds[key].currentTime = 0;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
